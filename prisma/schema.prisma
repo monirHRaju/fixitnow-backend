@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Connection URL is now configured in prisma.config.ts
+  // This file is used for schema definition only
+}
+
+// ---------- Enums ----------
+
+enum UserRole {
+  CUSTOMER
+  TECHNICIAN
+  ADMIN
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  PAID
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ---------- User ----------
+
+/*
+ * Users table stores everyone who registers on the platform.
+ * A user is either a CUSTOMER, TECHNICIAN, or ADMIN (role is chosen at signup).
+ * Technicians get an additional TechnicianProfile record (1:1 relation).
+ */
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String   // bcrypt-hashed
+  role      UserRole @default(CUSTOMER)
+  address   String?
+  avatarUrl String?
+  isBanned  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  technicianProfile TechnicianProfile? // Only for TECHNICIAN role users
+  customerBookings  Booking[]          @relation("CustomerBookings")
+  reviews           Review[]
+  payments          Payment[]
+}
+
+// ---------- Technician Profile ----------
+
+/*
+ * Technician-specific information, linked 1:1 to a User with role=TECHNICIAN.
+ * skills is an array of strings like ["Plumbing", "Electrical"].
+ * hourlyRate is stored in the smallest currency unit (e.g., paisa/cents).
+ */
+model TechnicianProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  bio        String?
+  skills     String[] // e.g., ["Plumbing", "Electrical"]
+  experience Int?     // years of experience
+  hourlyRate Int?     // stored in smallest currency unit (e.g., 50000 = 500.00 BDT)
+  location   String?
+  isAvailable Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availability AvailabilitySlot[]
+  services     Service[]
+  bookings     Booking[]         @relation("TechnicianBookings")
+}
+
+// ---------- Availability Slot ----------
+
+/*
+ * Defines when a technician is available to take bookings.
+ * dayOfWeek: 0=Sunday, 1=Monday ... 6=Saturday
+ * startTime/endTime in "HH:MM" 24-hour format.
+ * Unique constraint prevents duplicate slots for the same day+time.
+ */
+model AvailabilitySlot {
+  id            String   @id @default(cuid())
+  technicianId  String
+  dayOfWeek     Int      // 0=Sun ... 6=Sat
+  startTime     String   // "09:00"
+  endTime       String   // "17:00"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation
+  technician TechnicianProfile @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, dayOfWeek, startTime, endTime])
+}
+
+// ---------- Category ----------
+
+/*
+ * Service categories like "Plumbing", "Electrical", "Cleaning", "Painting".
+ * Each category can have many services listed under it.
+ */
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  iconUrl     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  services Service[]
+}
+
+// ---------- Service ----------
+
+/*
+ * A specific service offered by a technician under a category.
+ * e.g., Technician "John" offers "Pipe Repair" under "Plumbing" for 1500 BDT.
+ * price stored in smallest currency unit.
+ */
+model Service {
+  id           String   @id @default(cuid())
+  technicianId String
+  categoryId   String
+  title        String
+  description  String?
+  price        Int      // smallest currency unit (e.g., 150000 = 1,500.00 BDT)
+  durationMins Int?
+  isActive     Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  technician TechnicianProfile @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  category   Category          @relation(fields: [categoryId], references: [id])
+  bookings   Booking[]
+}
+
+// ---------- Booking ----------
+
+/*
+ * A booking connects a customer with a technician for a specific service.
+ * Status flow: REQUESTED → ACCEPTED/DECLINED → PAID → IN_PROGRESS → COMPLETED
+ * Customers can CANCELLED at any point before IN_PROGRESS.
+ */
+model Booking {
+  id           String        @id @default(cuid())
+  customerId   String
+  technicianId String
+  serviceId    String
+  scheduledAt  DateTime      // When the customer wants the service
+  address      String        // Where the service will be performed
+  notes        String?
+  status       BookingStatus @default(REQUESTED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  customer   User              @relation("CustomerBookings", fields: [customerId], references: [id])
+  technician TechnicianProfile @relation("TechnicianBookings", fields: [technicianId], references: [id])
+  service    Service           @relation(fields: [serviceId], references: [id])
+  payment    Payment?
+  review     Review?
+}
+
+// ---------- Payment ----------
+
+/*
+ * Tracks payment transactions for bookings.
+ * provider: "sslcommerz" (or "stripe" in future).
+ * amount in smallest currency unit.
+ * transactionId stores the gateway's transaction reference.
+ */
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String        @unique
+  userId        String
+  amount        Int           // smallest currency unit
+  method        String?       // payment method used (e.g., "credit card", "mobile banking")
+  provider      String        @default("sslcommerz")
+  transactionId String?       // gateway transaction reference
+  status        PaymentStatus @default(PENDING)
+  paidAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+// ---------- Review ----------
+
+/*
+ * Customer reviews for completed bookings.
+ * rating is 1-5 stars. One review per booking (bookingId is unique).
+ */
+model Review {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  userId    String
+  rating    Int      // 1-5
+  comment   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+}
