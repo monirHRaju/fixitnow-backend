@@ -13,6 +13,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
+import authRoutes from "./routes/auth.routes";
 
 // Initialize Express application
 const app = express();
@@ -46,7 +47,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Placeholder for future route modules:
-// app.use("/api/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 // app.use("/api/services", serviceRoutes);
 // app.use("/api/technicians", technicianRoutes);
 // app.use("/api/categories", categoryRoutes);
