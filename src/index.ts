@@ -17,6 +17,8 @@ import authRoutes from "./routes/auth.routes";
 import categoryRoutes from "./routes/category.routes";
 import serviceRoutes from "./routes/service.routes";
 import technicianRoutes from "./routes/technician.routes";
+import bookingRoutes from "./routes/booking.routes";
+import paymentRoutes from "./routes/payment.routes";
 
 // Initialize Express application
 const app = express();
@@ -54,9 +56,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", serviceRoutes);
 app.use("/api", technicianRoutes);
-// app.use("/api/categories", categoryRoutes);
-// app.use("/api/bookings", bookingRoutes);
-// app.use("/api/payments", paymentRoutes);
+app.use("/api", bookingRoutes);
+app.use("/api", paymentRoutes);
 // app.use("/api/reviews", reviewRoutes);
 // app.use("/api/admin", adminRoutes);
 
@@ -76,15 +77,7 @@ app.use(errorHandler);
 // ==================== Start Server ====================
 
 app.listen(env.PORT, () => {
-  console.log(`
-  ╔══════════════════════════════════════════════╗
-  ║        FixItNow Backend Server               ║
-  ╠══════════════════════════════════════════════╣
-  ║  Status: Running                             ║
-  ║  Port:   ${String(env.PORT).padEnd(33)}║
-  ║  Env:     ${env.NODE_ENV.padEnd(33)}║
-  ╚══════════════════════════════════════════════╝
-  `);
+  console.log(`FixItNow is running at http://localhost:${String(env.PORT).padEnd(33)}`);
 });
 
 export default app;
