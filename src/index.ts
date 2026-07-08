@@ -14,6 +14,7 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
+import categoryRoutes from "./routes/category.routes";
 
 // Initialize Express application
 const app = express();
@@ -48,6 +49,7 @@ app.get("/api/health", (_req, res) => {
 
 // Placeholder for future route modules:
 app.use("/api/auth", authRoutes);
+app.use("/api", categoryRoutes);
 // app.use("/api/services", serviceRoutes);
 // app.use("/api/technicians", technicianRoutes);
 // app.use("/api/categories", categoryRoutes);
