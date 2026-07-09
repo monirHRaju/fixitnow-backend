@@ -10,6 +10,7 @@ import {
   ForbiddenError,
 } from "../lib/errors";
 import type { BookingStatus } from "@prisma/client";
+import { parsePagination, paginationMeta } from "../lib/pagination";
 
 // Valid cancellation targets
 const CANCELLABLE_STATUSES: BookingStatus[] = [
@@ -128,23 +129,32 @@ export async function list(
       where.status = status as BookingStatus;
     }
 
-    const bookings = await prisma.booking.findMany({
-      where,
-      include: {
-        technician: {
-          select: {
-            id: true,
-            location: true,
-            user: { select: { id: true, name: true, avatarUrl: true } },
+    const { page, limit, skip } = parsePagination(req.query as any);
+    const [total, bookings] = await Promise.all([
+      prisma.booking.count({ where }),
+      prisma.booking.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          technician: {
+            select: {
+              id: true,
+              location: true,
+              user: { select: { id: true, name: true, avatarUrl: true } },
+            },
           },
+          service: { select: { id: true, title: true, price: true, durationMins: true } },
+          payment: { select: { status: true, amount: true } },
         },
-        service: { select: { id: true, title: true, price: true, durationMins: true } },
-        payment: { select: { status: true, amount: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
-    res.json({ success: true, data: { bookings } });
+    res.json({
+      success: true,
+      data: { bookings, pagination: paginationMeta(total, { page, limit, skip }) },
+    });
   } catch (error) {
     next(error);
   }

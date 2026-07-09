@@ -6,6 +6,7 @@ import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { NotFoundError, BadRequestError, ForbiddenError } from "../lib/errors";
 import type { BookingStatus } from "@prisma/client";
+import { parsePagination, paginationMeta } from "../lib/pagination";
 
 /**
  * GET /api/technicians
@@ -39,14 +40,20 @@ export async function list(
       if (maxRate) where.hourlyRate.lte = parseInt(maxRate as string, 10);
     }
 
-    const technicians = await prisma.technicianProfile.findMany({
-      where,
-      include: {
-        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
-        _count: { select: { services: true, bookings: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const { page, limit, skip } = parsePagination(req.query as any);
+    const [total, technicians] = await Promise.all([
+      prisma.technicianProfile.count({ where }),
+      prisma.technicianProfile.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          _count: { select: { services: true, bookings: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
     // Compute average rating from completed bookings with reviews
     const profileIds = technicians.map((t) => t.id);
@@ -75,7 +82,7 @@ export async function list(
       return { ...t, avgRating, reviewCount };
     });
 
-    res.json({ success: true, data: { technicians: result } });
+    res.json({ success: true, data: { technicians: result, pagination: paginationMeta(total, { page, limit, skip }) } });
   } catch (error) {
     next(error);
   }
@@ -255,17 +262,26 @@ export async function getBookings(
       where.status = status as BookingStatus;
     }
 
-    const bookings = await prisma.booking.findMany({
-      where,
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-        service: { select: { id: true, title: true, price: true, durationMins: true } },
-        payment: { select: { status: true, amount: true } },
-      },
-      orderBy: { scheduledAt: "desc" },
-    });
+    const { page, limit, skip } = parsePagination(req.query as any);
+    const [total, bookings] = await Promise.all([
+      prisma.booking.count({ where }),
+      prisma.booking.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          service: { select: { id: true, title: true, price: true, durationMins: true } },
+          payment: { select: { status: true, amount: true } },
+        },
+        orderBy: { scheduledAt: "desc" },
+      }),
+    ]);
 
-    res.json({ success: true, data: { bookings } });
+    res.json({
+      success: true,
+      data: { bookings, pagination: paginationMeta(total, { page, limit, skip }) },
+    });
   } catch (error) {
     next(error);
   }

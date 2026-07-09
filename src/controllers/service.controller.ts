@@ -5,6 +5,7 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { NotFoundError, BadRequestError } from "../lib/errors";
+import { parsePagination, paginationMeta } from "../lib/pagination";
 
 /**
  * GET /api/services
@@ -59,26 +60,32 @@ export async function list(
       where.technicianId = technician as string;
     }
 
-    const services = await prisma.service.findMany({
-      where,
-      include: {
-        category: { select: { id: true, name: true } },
-        technician: {
-          select: {
-            id: true,
-            location: true,
-            hourlyRate: true,
-            isAvailable: true,
-            user: { select: { id: true, name: true, avatarUrl: true } },
+    // Add pagination
+    const { page, limit, skip } = parsePagination(req.query as any);
+    const [total, services] = await Promise.all([
+      prisma.service.count({ where }),
+      prisma.service.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          category: { select: { id: true, name: true } },
+          technician: {
+            select: {
+              id: true,
+              location: true,
+              hourlyRate: true,
+              isAvailable: true,
+              user: { select: { id: true, name: true, avatarUrl: true } },
+            },
           },
+          _count: { select: { bookings: true } },
         },
-        _count: { select: { bookings: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
     // Attach average rating per service from reviews
-    // (computed via the bookings that have reviews)
     const serviceIds = services.map((s) => s.id);
     const bookings = await prisma.booking.findMany({
       where: { serviceId: { in: serviceIds }, review: { isNot: null } },
@@ -104,7 +111,10 @@ export async function list(
 
     res.json({
       success: true,
-      data: { services: servicesWithRating },
+      data: {
+        services: servicesWithRating,
+        pagination: paginationMeta(total, { page, limit, skip }),
+      },
     });
   } catch (error) {
     next(error);

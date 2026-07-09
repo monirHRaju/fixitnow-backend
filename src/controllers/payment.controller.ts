@@ -7,6 +7,7 @@ import prisma from "../lib/prisma";
 import { env } from "../config/env";
 import { initPayment, validatePayment, verifyIpnHash } from "../lib/sslcommerz";
 import { NotFoundError, BadRequestError } from "../lib/errors";
+import { parsePagination, paginationMeta } from "../lib/pagination";
 
 /**
  * POST /api/payments/create
@@ -198,22 +199,33 @@ export async function listPayments(
   next: NextFunction
 ): Promise<void> {
   try {
-    const payments = await prisma.payment.findMany({
-      where: { userId: req.user!.id },
-      include: {
-        booking: {
-          select: {
-            id: true,
-            status: true,
-            scheduledAt: true,
-            service: { select: { title: true } },
+    const where = { userId: req.user!.id };
+
+    const { page, limit, skip } = parsePagination(req.query as any);
+    const [total, payments] = await Promise.all([
+      prisma.payment.count({ where }),
+      prisma.payment.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          booking: {
+            select: {
+              id: true,
+              status: true,
+              scheduledAt: true,
+              service: { select: { title: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
-    res.json({ success: true, data: { payments } });
+    res.json({
+      success: true,
+      data: { payments, pagination: paginationMeta(total, { page, limit, skip }) },
+    });
   } catch (error) {
     next(error);
   }
