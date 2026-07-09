@@ -23,3 +23,36 @@ export const env = {
   SSLC_STORE_PASSWORD: process.env.SSLC_STORE_PASSWORD || "",
   SSLC_SANDBOX: process.env.SSLC_SANDBOX === "true",
 } as const;
+
+/**
+ * Validate that required environment variables are set.
+ * Call this during server startup to fail early.
+ */
+export function validateEnv(): void {
+  const required = [
+    { key: "DATABASE_URL", value: env.DATABASE_URL },
+    { key: "JWT_SECRET", value: env.JWT_SECRET },
+  ];
+
+  const missing = required.filter((r) => !r.value || r.value === "change-me-to-a-random-secret-in-production");
+  const warnings = missing
+    .map((r) => {
+      if (r.value === "change-me-to-a-random-secret-in-production") {
+        return `⚠️  WARNING: JWT_SECRET is still set to default value. Change it in production!`;
+      }
+      return `❌  MISSING: ${r.key} is not set. Check your .env file.`;
+    })
+    .filter(Boolean);
+
+  if (warnings.length > 0) {
+    for (const w of warnings) {
+      console.warn(w);
+    }
+    if (warnings.some((w) => w.startsWith("❌"))) {
+      console.error("❌ Server cannot start without required environment variables.");
+      process.exit(1);
+    }
+  }
+
+  console.log("✅ Environment configuration validated");
+}

@@ -27,11 +27,13 @@ export function validate(schema: ZodSchema) {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        // Format Zod errors into a user-friendly message
-        const messages = error.issues.map(
-          (e: any) => `${e.path?.join(".") || ""}: ${e.message}`
-        );
-        next(new BadRequestError(messages.join("; ")));
+        // Format Zod errors into structured error details
+        const errorDetails = error.issues.map((e: any) => ({
+          field: e.path?.join(".") || "",
+          message: e.message,
+          code: e.code,
+        }));
+        next(new BadRequestError("Validation failed", errorDetails));
       } else {
         next(error);
       }
