@@ -5,6 +5,7 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { NotFoundError, BadRequestError, ForbiddenError } from "../lib/errors";
+import { parsePagination, paginationMeta } from "../lib/pagination";
 
 /**
  * POST /api/reviews
@@ -86,23 +87,34 @@ export async function list(
   next: NextFunction
 ): Promise<void> {
   try {
-    const reviews = await prisma.review.findMany({
-      where: { userId: req.user!.id },
-      include: {
-        booking: {
-          select: {
-            id: true,
-            service: { select: { title: true } },
-            technician: {
-              select: { user: { select: { name: true } } },
+    const where = { userId: req.user!.id };
+
+    const { page, limit, skip } = parsePagination(req.query as any);
+    const [total, reviews] = await Promise.all([
+      prisma.review.count({ where }),
+      prisma.review.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          booking: {
+            select: {
+              id: true,
+              service: { select: { title: true } },
+              technician: {
+                select: { user: { select: { name: true } } },
+              },
             },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
-    res.json({ success: true, data: { reviews } });
+    res.json({
+      success: true,
+      data: { reviews, pagination: paginationMeta(total, { page, limit, skip }) },
+    });
   } catch (error) {
     next(error);
   }
