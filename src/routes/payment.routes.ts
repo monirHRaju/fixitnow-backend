@@ -8,11 +8,13 @@
  */
 import { Router } from "express";
 import { authenticate, optionalAuth } from "../middleware/auth";
+import { validate } from "../middleware/validate";
+import { createPaymentSchema } from "../validators/payment.schema";
 import * as paymentController from "../controllers/payment.controller";
 
 const router = Router();
 
-router.post("/payments/create", authenticate, paymentController.createPayment);
+router.post("/payments/create", authenticate, validate(createPaymentSchema), paymentController.createPayment);
 router.post("/payments/confirm", paymentController.confirmPayment);
 router.get("/payments", authenticate, paymentController.listPayments);
 router.get("/payments/:id", authenticate, paymentController.getPayment);
