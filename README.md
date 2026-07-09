@@ -61,7 +61,8 @@ npm run dev
 | POST   | `/api/auth/login`                 | Login, get JWT                  | No            |
 | GET    | `/api/auth/me`                    | Current user profile            | Yes           |
 | GET    | `/api/categories`                 | List categories                 | No            |
-| POST   | `/api/categories`                 | Create category                 | Admin         |
+| GET    | `/api/admin/categories`            | List all categories                 | Admin         |
+| POST   | `/api/admin/categories`            | Create category                     | Admin         |
 | GET    | `/api/services`                   | List services (filterable)      | No            |
 | GET    | `/api/technicians`                | List technicians (filterable)   | No            |
 | GET    | `/api/technicians/:id`            | Technician profile              | No            |
@@ -85,7 +86,7 @@ npm run dev
 | GET    | `/api/reviews/technician/:id`     | List technician reviews         | No            |
 | GET    | `/api/admin/dashboard`            | Platform statistics             | Admin         |
 | GET    | `/api/admin/users`                | List all users                  | Admin         |
-| PATCH  | `/api/admin/users/:id/ban`        | Ban/unban user                  | Admin         |
+| PATCH  | `/api/admin/users/:id`             | Ban/unban user                  | Admin         |
 | GET    | `/api/admin/bookings`             | List all bookings               | Admin         |
 
 ## Error Response Format
