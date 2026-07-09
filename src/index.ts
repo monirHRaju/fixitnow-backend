@@ -13,6 +13,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env";
 import { validateEnv } from "./config/env";
+import { sanitizeInput } from "./middleware/sanitize";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
 import categoryRoutes from "./routes/category.routes";
@@ -44,6 +45,9 @@ app.use(express.json());
 
 // Parse URL-encoded request bodies
 app.use(express.urlencoded({ extended: true }));
+
+// Sanitize all incoming request bodies (trim strings)
+app.use(sanitizeInput);
 
 // ==================== Routes ====================
 
