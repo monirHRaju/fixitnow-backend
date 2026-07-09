@@ -12,6 +12,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env";
+import { validateEnv } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
 import categoryRoutes from "./routes/category.routes";
@@ -89,6 +90,9 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 // ==================== Start Server ====================
+
+// Validate environment before starting
+validateEnv();
 
 app.listen(env.PORT, () => {
   console.log(`FixItNow is running at http://localhost:${String(env.PORT).padEnd(33)}`);
