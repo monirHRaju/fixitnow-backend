@@ -4,6 +4,7 @@
  */
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
+import { NotFoundError, BadRequestError } from "../lib/errors";
 
 /**
  * GET /api/services
@@ -105,6 +106,204 @@ export async function list(
       success: true,
       data: { services: servicesWithRating },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/technician/services
+ * Create a new service (authenticated technician only).
+ */
+export async function create(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const profile = await prisma.technicianProfile.findUnique({
+      where: { userId: req.user!.id },
+    });
+
+    if (!profile) {
+      throw new NotFoundError("Technician profile not found");
+    }
+
+    const { categoryId, title, description, price, durationMins } = req.body;
+
+    // Verify the category exists
+    const category = await prisma.category.findUnique({
+      where: { id: categoryId },
+    });
+    if (!category) {
+      throw new NotFoundError("Category not found");
+    }
+
+    const service = await prisma.service.create({
+      data: {
+        technicianId: profile.id,
+        categoryId,
+        title,
+        description,
+        price,
+        durationMins,
+      },
+      include: {
+        category: { select: { id: true, name: true } },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Service created",
+      data: { service },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PUT /api/technician/services/:id
+ * Update own service (authenticated technician only).
+ */
+export async function update(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const profile = await prisma.technicianProfile.findUnique({
+      where: { userId: req.user!.id },
+    });
+
+    if (!profile) {
+      throw new NotFoundError("Technician profile not found");
+    }
+
+    const service = await prisma.service.findUnique({
+      where: { id: req.params.id as string },
+    });
+
+    if (!service) {
+      throw new NotFoundError("Service not found");
+    }
+
+    if (service.technicianId !== profile.id) {
+      throw new BadRequestError("You can only update your own services");
+    }
+
+    const { categoryId, title, description, price, durationMins, isActive } = req.body;
+
+    // If categoryId provided, verify it exists
+    if (categoryId) {
+      const category = await prisma.category.findUnique({
+        where: { id: categoryId },
+      });
+      if (!category) {
+        throw new NotFoundError("Category not found");
+      }
+    }
+
+    const updated = await prisma.service.update({
+      where: { id: service.id },
+      data: { categoryId, title, description, price, durationMins, isActive },
+      include: {
+        category: { select: { id: true, name: true } },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Service updated",
+      data: { service: updated },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/technician/services/:id
+ * Delete own service (authenticated technician only).
+ * Soft-delete by setting isActive=false.
+ */
+export async function remove(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const profile = await prisma.technicianProfile.findUnique({
+      where: { userId: req.user!.id },
+    });
+
+    if (!profile) {
+      throw new NotFoundError("Technician profile not found");
+    }
+
+    const service = await prisma.service.findUnique({
+      where: { id: req.params.id as string },
+    });
+
+    if (!service) {
+      throw new NotFoundError("Service not found");
+    }
+
+    if (service.technicianId !== profile.id) {
+      throw new BadRequestError("You can only delete your own services");
+    }
+
+    // Soft-delete — set inactive
+    await prisma.service.update({
+      where: { id: service.id },
+      data: { isActive: false },
+    });
+
+    res.json({
+      success: true,
+      message: "Service deleted",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/technician/services
+ * List own services (authenticated technician only).
+ */
+export async function listMyServices(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const profile = await prisma.technicianProfile.findUnique({
+      where: { userId: req.user!.id },
+    });
+
+    if (!profile) {
+      throw new NotFoundError("Technician profile not found");
+    }
+
+    const { includeInactive } = req.query;
+
+    const where: any = { technicianId: profile.id };
+    if (includeInactive !== "true") {
+      where.isActive = true;
+    }
+
+    const services = await prisma.service.findMany({
+      where,
+      include: {
+        category: { select: { id: true, name: true } },
+        _count: { select: { bookings: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ success: true, data: { services } });
   } catch (error) {
     next(error);
   }
