@@ -9,13 +9,14 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
 import { validate } from "../middleware/validate";
+import { paymentLimiter } from "../middleware/rateLimiter";
 import { createPaymentSchema } from "../validators/payment.schema";
 import * as paymentController from "../controllers/payment.controller";
 import * as paymentRedirectController from "../controllers/payment-redirect.controller";
 
 const router = Router();
 
-router.post("/payments/create", authenticate, validate(createPaymentSchema), paymentController.createPayment);
+router.post("/payments/create", paymentLimiter, authenticate, validate(createPaymentSchema), paymentController.createPayment);
 router.post("/payments/confirm", paymentController.confirmPayment);
 router.get("/payments/success", paymentRedirectController.paymentSuccess);
 router.get("/payments/fail", paymentRedirectController.paymentFail);

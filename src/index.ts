@@ -14,6 +14,7 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import { validateEnv } from "./config/env";
 import { sanitizeInput } from "./middleware/sanitize";
+import { apiLimiter, authLimiter, paymentLimiter } from "./middleware/rateLimiter";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
 import categoryRoutes from "./routes/category.routes";
@@ -30,6 +31,9 @@ import swaggerUi from "swagger-ui-express";
 const app = express();
 
 // ==================== Global Middleware ====================
+
+// Apply rate limiting to all API routes
+app.use("/api", apiLimiter);
 
 // Security headers (helmet)
 app.use(helmet());
@@ -69,7 +73,7 @@ app.get("/api/docs.json", (_req, res) => {
 });
 
 // Placeholder for future route modules:
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", serviceRoutes);
 app.use("/api", technicianRoutes);
