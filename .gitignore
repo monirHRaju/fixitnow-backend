@@ -23,3 +23,9 @@ Thumbs.db
 
 # PostgreSQL data (local instance)
 pgdata/
+
+# others
+check_load.js
+debug_routes.js
+express_test.js
+test-phase4.sh

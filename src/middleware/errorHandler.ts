@@ -28,9 +28,16 @@ export function errorHandler(
     console.error(err.stack);
   }
 
+  const errorDetails =
+    err instanceof AppError && err.errorDetails
+      ? err.errorDetails
+      : process.env.NODE_ENV === "development"
+        ? { stack: err.stack }
+        : undefined;
+
   res.status(statusCode).json({
     success: false,
     message,
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+    ...(errorDetails && { errorDetails }),
   });
 }
