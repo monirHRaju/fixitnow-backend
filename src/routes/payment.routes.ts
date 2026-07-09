@@ -7,15 +7,19 @@
  * GET   /api/payments/:id         — single payment details (customer)
  */
 import { Router } from "express";
-import { authenticate, optionalAuth } from "../middleware/auth";
+import { authenticate } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { createPaymentSchema } from "../validators/payment.schema";
 import * as paymentController from "../controllers/payment.controller";
+import * as paymentRedirectController from "../controllers/payment-redirect.controller";
 
 const router = Router();
 
 router.post("/payments/create", authenticate, validate(createPaymentSchema), paymentController.createPayment);
 router.post("/payments/confirm", paymentController.confirmPayment);
+router.get("/payments/success", paymentRedirectController.paymentSuccess);
+router.get("/payments/fail", paymentRedirectController.paymentFail);
+router.get("/payments/cancel", paymentRedirectController.paymentCancel);
 router.get("/payments", authenticate, paymentController.listPayments);
 router.get("/payments/:id", authenticate, paymentController.getPayment);
 
