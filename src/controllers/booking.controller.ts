@@ -11,6 +11,7 @@ import {
 } from "../lib/errors";
 import type { BookingStatus } from "@prisma/client";
 import { parsePagination, paginationMeta } from "../lib/pagination";
+import { sendBookingCreated, sendBookingCancelled } from "../lib/email";
 
 // Valid cancellation targets
 const CANCELLABLE_STATUSES: BookingStatus[] = [
@@ -101,6 +102,19 @@ export async function create(
         service: { select: { id: true, title: true, price: true, durationMins: true } },
       },
     });
+
+    // Send email notification
+    sendBookingCreated({
+      customerEmail: req.user!.email,
+      customerName: req.user!.name,
+      technicianName: booking.technician.user.name,
+      serviceTitle: booking.service.title,
+      price: booking.service.price,
+      scheduledAt: booking.scheduledAt.toISOString(),
+      address: booking.address,
+      bookingId: booking.id,
+      status: booking.status,
+    }).catch((err) => console.error("[EMAIL] Failed to send booking created:", err));
 
     res.status(201).json({
       success: true,
@@ -238,10 +252,29 @@ export async function cancel(
       where: { id: booking.id },
       data: { status: "CANCELLED" },
       include: {
+        customer: { select: { name: true, email: true } },
+        technician: {
+          select: {
+            user: { select: { name: true } },
+          },
+        },
         service: { select: { title: true, price: true } },
         payment: { select: { status: true } },
       },
     });
+
+    // Send cancellation email
+    sendBookingCancelled({
+      customerEmail: req.user!.email,
+      customerName: req.user!.name,
+      technicianName: updated.technician?.user?.name ?? "Technician",
+      serviceTitle: updated.service.title,
+      price: updated.service.price,
+      scheduledAt: "",
+      address: "",
+      bookingId: updated.id,
+      status: "CANCELLED",
+    }).catch((err) => console.error("[EMAIL] Failed to send cancellation:", err));
 
     res.json({
       success: true,

@@ -7,6 +7,7 @@ import prisma from "../lib/prisma";
 import { NotFoundError, BadRequestError, ForbiddenError } from "../lib/errors";
 import type { BookingStatus } from "@prisma/client";
 import { parsePagination, paginationMeta } from "../lib/pagination";
+import { sendBookingAccepted, sendBookingCompleted } from "../lib/email";
 
 /**
  * GET /api/technicians
@@ -339,10 +340,43 @@ export async function updateBookingStatus(
       where: { id: booking.id },
       data: { status: newStatus },
       include: {
-        customer: { select: { id: true, name: true, phone: true } },
+        customer: { select: { id: true, name: true, email: true } },
+        technician: {
+          select: {
+            user: { select: { name: true, email: true } },
+          },
+        },
         service: { select: { id: true, title: true, price: true } },
       },
     });
+
+    // Send email notifications for status transitions
+    if (newStatus === "ACCEPTED") {
+      sendBookingAccepted({
+        customerEmail: updated.customer.email,
+        customerName: updated.customer.name,
+        technicianEmail: updated.technician.user.email,
+        technicianName: updated.technician.user.name,
+        serviceTitle: updated.service.title,
+        price: updated.service.price,
+        scheduledAt: updated.scheduledAt.toISOString(),
+        address: updated.address,
+        bookingId: updated.id,
+        status: newStatus,
+      }).catch((err) => console.error("[EMAIL] Failed to send accepted:", err));
+    } else if (newStatus === "COMPLETED") {
+      sendBookingCompleted({
+        customerEmail: updated.customer.email,
+        customerName: updated.customer.name,
+        technicianName: updated.technician.user.name,
+        serviceTitle: updated.service.title,
+        price: updated.service.price,
+        scheduledAt: "",
+        address: "",
+        bookingId: updated.id,
+        status: newStatus,
+      }).catch((err) => console.error("[EMAIL] Failed to send completed:", err));
+    }
 
     res.json({
       success: true,
