@@ -21,6 +21,8 @@ import bookingRoutes from "./routes/booking.routes";
 import paymentRoutes from "./routes/payment.routes";
 import adminRoutes from "./routes/admin.routes";
 import reviewRoutes from "./routes/review.routes";
+import { swaggerSpec } from "./config/swagger";
+import swaggerUi from "swagger-ui-express";
 
 // Initialize Express application
 const app = express();
@@ -51,6 +53,14 @@ app.get("/api/health", (_req, res) => {
     message: "FixItNow API is running",
     timestamp: new Date().toISOString(),
   });
+});
+
+// Swagger/OpenAPI documentation
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// JSON endpoint for the raw OpenAPI spec
+app.get("/api/docs.json", (_req, res) => {
+  res.json(swaggerSpec);
 });
 
 // Placeholder for future route modules:
