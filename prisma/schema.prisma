@@ -4,8 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Connection URL is now configured in prisma.config.ts
-  // This file is used for schema definition only
+  // Connection URL is configured in prisma.config.ts (Prisma v7)
+  // Pass adapter to PrismaClient constructor at runtime
 }
 
 // ---------- Enums ----------
