@@ -2,12 +2,13 @@
   "version": 2,
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 10
+  "builds": [
+    {
+      "src": "dist/app.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
-    { "src": "/(.*)", "dest": "api/index.ts" }
+    { "src": "/(.*)", "dest": "dist/app.js" }
   ]
 }
