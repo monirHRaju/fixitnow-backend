@@ -122,6 +122,60 @@ export async function list(
 }
 
 /**
+ * GET /api/services/:id
+ * Get a single service by ID with full details.
+ */
+export async function getById(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const service = await prisma.service.findUnique({
+      where: { id: req.params.id },
+      include: {
+        category: { select: { id: true, name: true } },
+        technician: {
+          select: {
+            id: true,
+            location: true,
+            hourlyRate: true,
+            isAvailable: true,
+            user: { select: { id: true, name: true, avatarUrl: true } },
+          },
+        },
+        _count: { select: { bookings: true } },
+      },
+    });
+
+    if (!service) {
+      throw new NotFoundError("Service not found");
+    }
+
+    // Get average rating
+    const bookings = await prisma.booking.findMany({
+      where: { serviceId: service.id, review: { isNot: null } },
+      select: { review: { select: { rating: true } } },
+    });
+
+    let avgRating: number | null = null;
+    let reviewCount = 0;
+    if (bookings.length > 0) {
+      const sum = bookings.reduce((acc, b) => acc + (b.review?.rating || 0), 0);
+      avgRating = parseFloat((sum / bookings.length).toFixed(1));
+      reviewCount = bookings.length;
+    }
+
+    res.json({
+      success: true,
+      data: { service: { ...service, avgRating, reviewCount } },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * POST /api/technician/services
  * Create a new service (authenticated technician only).
  */
