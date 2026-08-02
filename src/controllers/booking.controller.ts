@@ -199,6 +199,7 @@ export async function getById(
         },
         service: { select: { id: true, title: true, description: true, price: true, durationMins: true } },
         payment: { select: { status: true, amount: true, method: true, transactionId: true, paidAt: true } },
+        review: { select: { id: true, rating: true, comment: true, createdAt: true } },
       },
     });
 
