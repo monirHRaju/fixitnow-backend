@@ -25,6 +25,7 @@ const router = Router();
 // === Public ===
 router.get("/technicians", technicianController.list);
 router.get("/technicians/:id", technicianController.getById);
+router.get("/technicians/:id/availability", technicianController.getAvailability);
 
 // === Technician-only ===
 router.put(

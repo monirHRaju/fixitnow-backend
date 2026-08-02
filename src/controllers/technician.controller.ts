@@ -387,3 +387,72 @@ export async function updateBookingStatus(
     next(error);
   }
 }
+
+/**
+ * GET /api/technicians/:id/availability?date=YYYY-MM-DD
+ * Returns the technician's availability slots for the day-of-week matching the
+ * given date, plus the already-booked (non-cancelled) times on that exact date.
+ * This powers the interactive time-slot picker in the booking form:
+ *   - dayOfWeek   : 0=Sun...6=Sat derived from the requested date
+ *   - slots       : availability blocks for that dayOfWeek
+ *   - bookedTimes : ISO datetime strings of existing bookings on that date
+ */
+export async function getAvailability(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const technicianId: string = id as string;
+    const { date } = req.query;
+
+    if (!date || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestError("date query param is required in YYYY-MM-DD format");
+    }
+    const dateStr: string = date;
+
+    const tech = await prisma.technicianProfile.findUnique({
+      where: { id: technicianId },
+      select: { id: true },
+    });
+    if (!tech) {
+      throw new NotFoundError("Technician not found");
+    }
+
+    // Local calendar date -> day of week (0=Sun ... 6=Sat)
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const dayOfWeek = new Date(y, m - 1, d).getDay();
+
+    const slots = await prisma.availabilitySlot.findMany({
+      where: { technicianId, dayOfWeek },
+      orderBy: { startTime: "asc" },
+    });
+
+    // Start/end boundaries for the requested date (local day)
+    const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
+    const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+    const endOfDayIso = endOfDay.toISOString();
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        technicianId,
+        scheduledAt: { gte: startOfDay.toISOString(), lte: endOfDayIso },
+        status: { not: "CANCELLED" },
+      },
+      select: { scheduledAt: true },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        date,
+        dayOfWeek,
+        slots,
+        bookedTimes: bookings.map((b) => b.scheduledAt.toISOString()),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}

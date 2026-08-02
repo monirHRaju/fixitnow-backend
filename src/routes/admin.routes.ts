@@ -25,6 +25,10 @@ router.get("/dashboard", adminController.dashboard);
 router.get("/users", adminController.listUsers);
 router.patch("/users/:id", adminController.toggleBan);
 router.get("/bookings", adminController.listBookings);
+router.get("/bookings/:id", adminController.getBookingById);
+router.patch("/bookings/:id/status", adminController.updateBookingStatus);
+router.patch("/bookings/:id/payment", adminController.overridePaymentStatus);
+router.patch("/bookings/:id/notes", adminController.updateBookingNotes);
 router.get("/categories", categoryController.list);
 router.post("/categories", validate(createCategorySchema), categoryController.create);
 

@@ -3,7 +3,7 @@
  */
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
-import { NotFoundError } from "../lib/errors";
+import { NotFoundError, BadRequestError } from "../lib/errors";
 
 /**
  * GET /api/admin/dashboard
@@ -224,6 +224,201 @@ export async function listBookings(
         },
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+const BOOKING_INCLUDE = {
+  customer: { select: { id: true, name: true, email: true, phone: true } },
+  technician: {
+    select: {
+      id: true,
+      location: true,
+      bio: true,
+      user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+    },
+  },
+  service: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      price: true,
+      durationMins: true,
+    },
+  },
+  payment: {
+    select: {
+      id: true,
+      status: true,
+      amount: true,
+      method: true,
+      provider: true,
+      transactionId: true,
+      paidAt: true,
+    },
+  },
+};
+
+/**
+ * GET /api/admin/bookings/:id
+ * Single booking with full details for admin management.
+ */
+export async function getBookingById(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id as string },
+      include: BOOKING_INCLUDE,
+    });
+
+    if (!booking) {
+      throw new NotFoundError("Booking not found");
+    }
+
+    res.json({ success: true, data: { booking } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PATCH /api/admin/bookings/:id/status
+ * Admin override / cancel a booking status (troubleshooting + moderation).
+ */
+export async function updateBookingStatus(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { status, reason } = req.body;
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id as string },
+    });
+
+    if (!booking) {
+      throw new NotFoundError("Booking not found");
+    }
+
+    const validStatuses = [
+      "REQUESTED",
+      "ACCEPTED",
+      "DECLINED",
+      "PAID",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ];
+    if (!status || !validStatuses.includes(status)) {
+      throw new BadRequestError("Invalid booking status");
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status },
+      include: BOOKING_INCLUDE,
+    });
+
+    res.json({ success: true, data: { booking: updated, reason } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PATCH /api/admin/bookings/:id/payment
+ * Override payment status for troubleshooting (PENDING / COMPLETED / FAILED).
+ */
+export async function overridePaymentStatus(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { status } = req.body;
+    if (!["PENDING", "COMPLETED", "FAILED"].includes(status)) {
+      throw new BadRequestError("Invalid payment status");
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id as string },
+      include: { payment: true },
+    });
+    if (!booking) {
+      throw new NotFoundError("Booking not found");
+    }
+
+    let payment = booking.payment;
+    if (!payment) {
+      payment = await prisma.payment.create({
+        data: {
+          bookingId: booking.id,
+          userId: booking.customerId,
+          amount: 0,
+          provider: "admin",
+          status,
+          paidAt: status === "COMPLETED" ? new Date() : null,
+        },
+      });
+      // amount: fall back to booking service price
+      const svc = await prisma.service.findUnique({
+        where: { id: booking.serviceId },
+        select: { price: true },
+      });
+      payment = await prisma.payment.update({
+        where: { id: payment.id },
+        data: { amount: svc?.price ?? 0, paidAt: status === "COMPLETED" ? new Date() : null },
+      });
+    } else {
+      payment = await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status,
+          paidAt: status === "COMPLETED" ? new Date() : null,
+        },
+      });
+    }
+
+    res.json({ success: true, data: { payment } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PATCH /api/admin/bookings/:id/notes
+ * Add/edit admin notes on a booking.
+ */
+export async function updateBookingNotes(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { notes } = req.body;
+    if (typeof notes !== "string") {
+      throw new BadRequestError("notes must be a string");
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id as string },
+    });
+    if (!booking) {
+      throw new NotFoundError("Booking not found");
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id: booking.id },
+      data: { notes },
+      include: BOOKING_INCLUDE,
+    });
+
+    res.json({ success: true, data: { booking: updated } });
   } catch (error) {
     next(error);
   }

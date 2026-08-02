@@ -1,6 +1,7 @@
 /**
  * Service routes.
  * GET  /api/services — public listing with filters
+ * GET  /api/services/:id — public get by ID
  *
  * Technician-managed (under /api/technician/services):
  * POST   — create service
@@ -21,6 +22,7 @@ const router = Router();
 
 // Public listings
 router.get("/services", serviceController.list);
+router.get("/services/:id", serviceController.getById);
 
 // Technician-only: manage own services
 router.post(
