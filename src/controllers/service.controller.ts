@@ -16,6 +16,8 @@ import { parsePagination, paginationMeta } from "../lib/pagination";
  *   ?maxPrice=   — maximum price
  *   ?location=   — filter by technician location
  *   ?technician= — filter by technician ID
+ *   ?sort=       — sort: price_asc, price_desc, newest, rating
+ *   ?minRating=  — minimum average rating (1-5)
  */
 export async function list(
   req: Request,
@@ -30,6 +32,8 @@ export async function list(
       maxPrice,
       location,
       technician,
+      sort,
+      minRating,
     } = req.query;
 
     // Build where clause
@@ -60,6 +64,21 @@ export async function list(
       where.technicianId = technician as string;
     }
 
+    // Build orderBy
+    let orderBy: any = { createdAt: "desc" };
+    switch (sort) {
+      case "price_asc":
+        orderBy = { price: "asc" };
+        break;
+      case "price_desc":
+        orderBy = { price: "desc" };
+        break;
+      case "newest":
+        orderBy = { createdAt: "desc" };
+        break;
+      // "rating" is handled post-aggregation below
+    }
+
     // Add pagination
     const { page, limit, skip } = parsePagination(req.query as any);
     const [total, services] = await Promise.all([
@@ -68,6 +87,7 @@ export async function list(
         where,
         skip,
         take: limit,
+        orderBy,
         include: {
           category: { select: { id: true, name: true } },
           technician: {
@@ -79,9 +99,8 @@ export async function list(
               user: { select: { id: true, name: true, avatarUrl: true } },
             },
           },
-          _count: { select: { bookings: true } },
+_count: { select: { bookings: true } },
         },
-        orderBy: { createdAt: "desc" },
       }),
     ]);
 
@@ -109,10 +128,30 @@ export async function list(
       return { ...service, avgRating, reviewCount };
     });
 
+    // Filter by minimum rating if requested
+    let filteredServices = servicesWithRating;
+    if (minRating) {
+      const min = parseFloat(minRating as string);
+      if (!isNaN(min)) {
+        filteredServices = servicesWithRating.filter(
+          (s) => s.avgRating !== null && s.avgRating >= min
+        );
+      }
+    }
+
+    // Sort by rating if requested (after aggregation since rating isn't in DB)
+    if (sort === "rating") {
+      filteredServices.sort((a, b) => {
+        const aRating = a.avgRating ?? 0;
+        const bRating = b.avgRating ?? 0;
+        return bRating - aRating;
+      });
+    }
+
     res.json({
       success: true,
       data: {
-        services: servicesWithRating,
+        services: filteredServices,
         pagination: paginationMeta(total, { page, limit, skip }),
       },
     });
@@ -132,7 +171,7 @@ export async function getById(
 ): Promise<void> {
   try {
     const service = await prisma.service.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         category: { select: { id: true, name: true } },
         technician: {
