@@ -109,6 +109,7 @@ export async function getById(
           include: { category: { select: { id: true, name: true } } },
           orderBy: { title: "asc" },
         },
+        _count: { select: { services: true, bookings: true } },
       },
     });
 
