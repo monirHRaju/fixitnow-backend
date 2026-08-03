@@ -20,6 +20,7 @@ export interface SslcInitParams {
   successUrl: string;
   failUrl: string;
   cancelUrl: string;
+  ipnUrl: string;
   cusName: string;
   cusEmail: string;
   cusPhone: string;
@@ -52,6 +53,7 @@ export async function initPayment(
   formData.append("success_url", params.successUrl);
   formData.append("fail_url", params.failUrl);
   formData.append("cancel_url", params.cancelUrl);
+  formData.append("ipn_url", params.ipnUrl);
   formData.append("cus_name", params.cusName);
   formData.append("cus_email", params.cusEmail);
   formData.append("cus_phone", params.cusPhone);
