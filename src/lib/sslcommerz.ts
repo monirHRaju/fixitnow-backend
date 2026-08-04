@@ -20,6 +20,7 @@ export interface SslcInitParams {
   successUrl: string;
   failUrl: string;
   cancelUrl: string;
+  ipnUrl: string;
   cusName: string;
   cusEmail: string;
   cusPhone: string;
@@ -52,6 +53,7 @@ export async function initPayment(
   formData.append("success_url", params.successUrl);
   formData.append("fail_url", params.failUrl);
   formData.append("cancel_url", params.cancelUrl);
+  formData.append("ipn_url", params.ipnUrl);
   formData.append("cus_name", params.cusName);
   formData.append("cus_email", params.cusEmail);
   formData.append("cus_phone", params.cusPhone);
@@ -66,7 +68,20 @@ export async function initPayment(
     body: formData.toString(),
   });
 
-  return (await res.json()) as SslcInitResponse;
+  const raw = (await res.json()) as Record<string, any>;
+
+  // SSLCommerz v4 returns the redirect destination as `GatewayPageURL`
+  // (fallback: `redirectGatewayURL`). There is NO `gateway_url` field —
+  // normalizing here keeps the `gateway_url` contract used downstream.
+  const gatewayUrl: string =
+    raw.GatewayPageURL || raw.redirectGatewayURL || raw.gateway_url || "";
+
+  return {
+    status: raw.status === "SUCCESS" ? "SUCCESS" : "FAILED",
+    failedreason: raw.failedreason,
+    gateway_url: gatewayUrl,
+    sessionkey: raw.sessionkey,
+  } as SslcInitResponse;
 }
 
 export interface SslcValidateParams {

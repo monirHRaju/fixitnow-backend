@@ -22,6 +22,9 @@ export const env = {
   SSLC_STORE_ID: process.env.SSLC_STORE_ID || "",
   SSLC_STORE_PASSWORD: process.env.SSLC_STORE_PASSWORD || "",
   SSLC_SANDBOX: process.env.SSLC_SANDBOX === "true",
+
+  // Frontend base URL (for success/fail/cancel redirects back to the app)
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
 } as const;
 
 /**

@@ -54,14 +54,18 @@ export async function createPayment(
 
     const tranId = `FN-${Date.now()}-${booking.id.slice(0, 8)}`;
 
+    const backendBase = `${req.protocol}://${req.get("host")}`;
+
     // Initiate SSLCommerz session
+    // total_amount is in TAKA, but booking.service.price is stored in paisa — divide by 100.
     const sslcResponse = await initPayment({
-      totalAmount: booking.service.price,
+      totalAmount: booking.service.price / 100,
       currency: "BDT",
       tranId,
-      successUrl: `${req.protocol}://${req.get("host")}/api/payments/confirm`,
-      failUrl: `${req.protocol}://${req.get("host")}/api/payments/fail`,
-      cancelUrl: `${req.protocol}://${req.get("host")}/api/payments/cancel`,
+      successUrl: `${backendBase}/api/payments/success`,
+      failUrl: `${backendBase}/api/payments/fail`,
+      cancelUrl: `${backendBase}/api/payments/cancel`,
+      ipnUrl: `${backendBase}/api/payments/confirm`,
       cusName: booking.customer.name,
       cusEmail: booking.customer.email,
       cusPhone: booking.customer.phone ?? booking.customer.email,
