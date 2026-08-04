@@ -68,7 +68,20 @@ export async function initPayment(
     body: formData.toString(),
   });
 
-  return (await res.json()) as SslcInitResponse;
+  const raw = (await res.json()) as Record<string, any>;
+
+  // SSLCommerz v4 returns the redirect destination as `GatewayPageURL`
+  // (fallback: `redirectGatewayURL`). There is NO `gateway_url` field —
+  // normalizing here keeps the `gateway_url` contract used downstream.
+  const gatewayUrl: string =
+    raw.GatewayPageURL || raw.redirectGatewayURL || raw.gateway_url || "";
+
+  return {
+    status: raw.status === "SUCCESS" ? "SUCCESS" : "FAILED",
+    failedreason: raw.failedreason,
+    gateway_url: gatewayUrl,
+    sessionkey: raw.sessionkey,
+  } as SslcInitResponse;
 }
 
 export interface SslcValidateParams {
